@@ -24,14 +24,29 @@ public class SiparisService {
 
     // @Transactional(readOnly = true): metot boyunca tek bir veritabani oturumu acik kalir.
     // Lazy iliskilere dokunabilmek icin gerekli, yoksa LazyInitializationException alirsin.
+    // ---- YAVAS YOL: duz findAll(), iliskiler tek tek cekilir -> N+1 ----
     @Transactional(readOnly = true)
     public List<Siparis> tumSiparisleriGetir() {
-        log.info(">>>>> SORGU SAYIMI BASLIYOR <<<<<");
-
+        log.info(">>>>> SAYIM BASLIYOR | YONTEM: findAll() <<<<<");
         List<Siparis> siparisler = siparisRepository.findAll();
+        ozetle(siparisler);
+        log.info(">>>>> SAYIM BITTI | findAll() | {} siparis <<<<<", siparisler.size());
+        return siparisler;
+    }
 
-        // Gercek bir is kurali: her siparisin toplam tutarini hesapla.
-        // Bunu yapmak icin kalemlere DOKUNMAK zorundayiz.
+    // ---- HIZLI YOL: JOIN FETCH, her sey tek sorguda ----
+    @Transactional(readOnly = true)
+    public List<Siparis> tumSiparisleriHizliGetir() {
+        log.info(">>>>> SAYIM BASLIYOR | YONTEM: JOIN FETCH <<<<<");
+        List<Siparis> siparisler = siparisRepository.tumunuIliskileriyleGetir();
+        ozetle(siparisler);
+        log.info(">>>>> SAYIM BITTI | JOIN FETCH | {} siparis <<<<<", siparisler.size());
+        return siparisler;
+    }
+
+    // Her iki yolda da AYNI isi yapiyoruz: kullaniciya ve kalemlere dokunup
+    // toplam tutari hesapliyoruz. Fark sadece verinin nasil cekildiginde.
+    private void ozetle(List<Siparis> siparisler) {
         for (Siparis siparis : siparisler) {
             BigDecimal toplam = BigDecimal.ZERO;
             for (SiparisKalemi kalem : siparis.getKalemler()) {
@@ -41,8 +56,5 @@ public class SiparisService {
                     siparis.getId(), siparis.getKullanici().getAd(),
                     siparis.getKalemler().size(), toplam);
         }
-
-        log.info(">>>>> SORGU SAYIMI BITTI | {} siparis islendi <<<<<", siparisler.size());
-        return siparisler;
     }
 }

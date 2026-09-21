@@ -65,18 +65,38 @@ Aşama 5'te `UrunService.urunGetir` içindeki `.orElse(null)` → `.orElseThrow(
 
 ---
 
-## Aşama 4 — İlişkiler ve N+1 ⚠️ KRİTİK
+## Aşama 4 — İlişkiler ve N+1 ✅ BİTTİ ⚠️ KRİTİK
 
-- [ ] `Kullanici` entity'si
-- [ ] `Siparis` entity'si
-- [ ] `SiparisKalemi` entity'si (sipariş ↔ ürün arası, adet + o anki fiyat)
-- [ ] `Kullanici` 1—N `Siparis`, `Siparis` 1—N `SiparisKalemi`, `SiparisKalemi` N—1 `Urun`
-- [ ] `show-sql=true` açıkken siparişleri listele, **loglardaki sorgu sayısını say**
-- [ ] N+1'i gör (1 sorgu + N adet ek sorgu)
-- [ ] `JOIN FETCH`'li `@Query` yaz, sorgu sayısının düştüğünü **aynı loglarda doğrula**
-- [ ] `@Transactional`'ı service katmanına uygula
-- [ ] Not tut: kaç sorgudan kaça düştü → mülakatta bu sayıyı söyleyeceksin
-- [ ] Commit: "Asama 4: iliskiler ve N+1 cozumu"
+- [x] `Kullanici` entity'si
+- [x] `Siparis` entity'si
+- [x] `SiparisKalemi` entity'si (sipariş ↔ ürün arası, adet + o anki fiyat)
+- [x] `Kullanici` 1—N `Siparis`, `Siparis` 1—N `SiparisKalemi`, `SiparisKalemi` N—1 `Urun`
+- [x] `show-sql=true` açıkken siparişleri listele, **loglardaki sorgu sayısını say**
+- [x] N+1'i gör (1 sorgu + N adet ek sorgu)
+- [x] `JOIN FETCH`'li `@Query` yaz, sorgu sayısının düştüğünü **aynı loglarda doğrula**
+- [x] `@Transactional(readOnly = true)` service katmanına uygulandı
+- [x] Not tut: kaç sorgudan kaça düştü
+- [x] Commit: "Asama 4: iliskiler ve N+1 cozumu"
+
+### 📌 MÜLAKATTA SÖYLEYECEĞİN SAYI
+
+**12 sipariş listelemek için 17 sorgu → 1 sorgu.**
+
+| | Sorgu | Dağılım |
+|---|---|---|
+| `findAll()` | **17** | 1 sipariş + 4 kullanıcı + 12 kalem |
+| `JOIN FETCH` (ilk hâli) | **6** | 1 birleşik + 5 ürün |
+| `JOIN FETCH` (tam hâli) | **1** | hepsi tek sorguda |
+
+İki endpoint de kodda duruyor, yan yana karşılaştırılabilir:
+`GET /api/siparisler` (yavaş) ve `GET /api/siparisler/hizli` (JOIN FETCH).
+
+**Anlatacağın hikâye:**
+1. `@ManyToOne` varsayılanı **EAGER**, `@OneToMany` varsayılanı **LAZY** — bu asimetri N+1'i doğuruyor.
+2. Kullanıcı sorgusu 12 değil 4 çıktı, çünkü **persistence context** (1. seviye önbellek) aynı id'yi tekrar sormuyor.
+3. İlk `JOIN FETCH`'ten sonra 6 sorgu kaldı: kalemlere inmiştik ama `k.urun`'a inmemiştik. **Bir N+1'i çözmek bir alttakini görünür kılar** — logları tekrar okumak şart.
+4. `LEFT JOIN FETCH s.kalemler k LEFT JOIN FETCH k.urun` ile 1'e indi.
+5. `DISTINCT` gerekli: 12 sipariş × 2 kalem = 24 satır döner, sipariş tekrarlanır.
 
 **Öğrenilecek:** İlişkiler, lazy/eager, N+1, `@Transactional`
 

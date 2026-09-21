@@ -18,8 +18,15 @@ public class SiparisController {
         this.siparisService = siparisService;
     }
 
+    // Yavas yol: N+1 uretir. Karsilastirma icin duruyor.
     @GetMapping
     public List<Siparis> tumSiparisleriGetir() {
         return siparisService.tumSiparisleriGetir();
+    }
+
+    // Hizli yol: JOIN FETCH ile tek sorgu.
+    @GetMapping("/hizli")
+    public List<Siparis> tumSiparisleriHizliGetir() {
+        return siparisService.tumSiparisleriHizliGetir();
     }
 }

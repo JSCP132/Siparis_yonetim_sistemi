@@ -104,14 +104,27 @@ Aşama 5'te `UrunService.urunGetir` içindeki `.orElse(null)` → `.orElseThrow(
 
 ## Aşama 5 — Validation ve Hata Yönetimi
 
-- [ ] pom'a `spring-boot-starter-validation` ekle
+- [x] pom'a `spring-boot-starter-validation` ekle
 - [ ] `dto` paketi → `UrunIstekDto`, `UrunYanitDto` (entity'yi dışarı açma)
 - [ ] `@NotNull`, `@NotBlank`, `@Min`, `@Positive` ile doğrulama
 - [ ] Controller'da `@Valid`
-- [ ] `exception` paketi → `UrunBulunamadiException` gibi kendi exception'ların
-- [ ] `GlobalExceptionHandler` (`@RestControllerAdvice`) → tek yerden hata yakalama
-- [ ] Doğru status kodları: 201 Created, 404, 400
+- [x] `exception` paketi → `UrunBulunamadiException` (`RuntimeException`, mesaj `super(...)` ile)
+- [x] `GlobalExceptionHandler` (`@RestControllerAdvice`) → tek yerden hata yakalama
+- [x] GET / PUT / DELETE olmayan id'de **404** (Postman'den test edildi)
+- [ ] Doğru status kodları: 201 Created, 400
+- [ ] (Ek) Siparişte kullanılan ürün silinince 500 yerine **409 Conflict** (`DataIntegrityViolationException`)
+- [x] Ara commit: "Asama 5 (1/2): exception ve GlobalExceptionHandler ile 404"
 - [ ] Commit: "Asama 5: validation ve hata yonetimi"
+
+**Takıldığın noktalar (tekrar et):**
+1. `System.out.println` mesajı exception'a koymaz → `super(mesaj)` ile üst sınıfa ver, yoksa `getMessage()` `null`.
+2. Mesajın formatını **tek yer** bilir: exception sınıfı. Handler `ex.getMessage()` ile taşır, sabit metin yazmaz.
+3. `orElseThrow` bir `Supplier` ister: `() -> new UrunBulunamadiException(id)`. Lambda = tek metotlu arayüzün (anonim sınıfın) kısa hâli. `<id>` generics sözdizimi, değer değil tip alır.
+4. Exception **çağrılmaz, fırlatılır**: `throw new ...(id);` — `return` değil.
+5. Service HTTP bilmez (`ResponseEntity`/`HttpStatus` yok); 404'e çevirmek handler'ın işi.
+6. Spring Data 3+'ta `deleteById` olmayan id'de sessiz kalır → önce `existsById`.
+7. PUT'ta gövde yoksa 400: Spring gövdeyi metodu çağırmadan **önce** okur, 404 kontrolüne sıra gelmez.
+8. Mülakat: `open-in-view` varsayılan açık → istek boyunca persistence context açık kalır (aynı `findById` ikinci kez DB'ye gitmez). Neden birçok ekip kapatır?
 
 **Öğrenilecek:** Bean Validation, global exception handling, DTO deseni
 

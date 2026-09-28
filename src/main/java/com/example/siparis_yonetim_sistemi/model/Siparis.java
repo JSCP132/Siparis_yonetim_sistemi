@@ -33,7 +33,6 @@ public class Siparis {
     @Column(nullable = false)
     private LocalDateTime tarih;
 
-    // ORNEK: iliskinin sahip tarafi. FK sutunu (kullanici_id) bu tabloda duruyor.
     @ManyToOne
     @JoinColumn(name = "kullanici_id")
     private Kullanici kullanici;
@@ -48,8 +47,6 @@ public class Siparis {
 
     public void kalemEkle(SiparisKalemi kalem) {
         kalemler.add(kalem);
-        // this = metodun uzerinde calistigi Siparis nesnesi.
-        // siparis.kalemEkle(kalem) dendiginde "this" iste o siparistir.
         kalem.setSiparis(this);
     }
 }

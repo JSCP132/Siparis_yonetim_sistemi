@@ -1,5 +1,7 @@
 package com.example.siparis_yonetim_sistemi.service;
 
+import com.example.siparis_yonetim_sistemi.dto.UrunIstekDto;
+import com.example.siparis_yonetim_sistemi.dto.UrunYanitDto;
 import com.example.siparis_yonetim_sistemi.exception.UrunBulunamadiException;
 import com.example.siparis_yonetim_sistemi.model.Urun;
 import com.example.siparis_yonetim_sistemi.repository.UrunRepository;
@@ -7,8 +9,6 @@ import com.example.siparis_yonetim_sistemi.repository.UrunRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-
-
 
 @Service
 public class UrunService {
@@ -19,42 +19,46 @@ public class UrunService {
         this.urunRepository = urunRepository;
     }
 
-    public List<Urun> tumUrunleriGetir() {
-        return urunRepository.findAll();
+    public List<UrunYanitDto> tumUrunleriGetir() {
+        return urunRepository.findAll().stream().map(urun -> yanitaDonustur(urun)).toList();
     }
 
-    public Urun urunEkle(Urun urun) {
-        return urunRepository.save(urun);
+    public UrunYanitDto urunEkle(UrunIstekDto istek) {
+        Urun urun=new Urun(null,istek.getAd(),istek.getFiyat(),istek.getStok());
+        Urun urun1 =urunRepository.save(urun);
+        return yanitaDonustur(urun1);
     }
 
-    public Urun urunGetir(Long id) {
-        // orElseThrow bir Supplier ister: parametre almayan, deger ureten fonksiyon.
-        // () -> ...  : "parametre almiyorum", sag taraf uretilecek exception.
-        // id, metodun parametresi; lambda onu disaridan yakaliyor (capture).
-        // Lambda sadece urun YOKSA calisir -> urun varsa exception nesnesi hic olusmaz.
+    public UrunYanitDto urunGetir(Long id) {
+        return yanitaDonustur(urunBul(id));
+    }
+
+    private Urun urunBul(Long id) {
         return urunRepository.findById(id).orElseThrow(() -> new UrunBulunamadiException(id));
     }
 
-    public Urun urunGuncelle(Long id, Urun yeniUrun) {
-        // Once veritabanindaki MEVCUT kaydi cekiyoruz; yoksa urunGetir exception firlatir.
-        Urun mevcut = urunGetir(id);
-
-        // Sadece alanlari degistiriyoruz, id'ye DOKUNMUYORUZ.
-        // Kritik nokta: save() cagrildiginda nesnenin id'si doluysa Hibernate
-        // INSERT degil UPDATE atar. Eger id'yi yeniUrun'dan alsaydik (null gelebilir)
-        // Hibernate bunu yeni kayit sanip INSERT atardi.
-        mevcut.setAd(yeniUrun.getAd());
-        mevcut.setFiyat(yeniUrun.getFiyat());
-        mevcut.setStok(yeniUrun.getStok());
-
-        return urunRepository.save(mevcut);
+    public UrunYanitDto urunGuncelle(Long id, UrunIstekDto istekDto) {
+        Urun mevcut = urunBul(id);
+        mevcut.setAd(istekDto.getAd());
+        mevcut.setFiyat(istekDto.getFiyat());
+        mevcut.setStok(istekDto.getStok());
+        Urun urun1 =urunRepository.save(mevcut);
+        return yanitaDonustur(urun1);
     }
 
     public void urunSil(Long id) {
-        // Spring Data 3+: deleteById olmayan id'de sessiz kalir (200 donerdi), o yuzden once kontrol.
         if(!urunRepository.existsById(id)){
             throw new UrunBulunamadiException(id);
         }
         urunRepository.deleteById(id);
+    }
+
+    private UrunYanitDto yanitaDonustur(Urun urun) {
+        return new UrunYanitDto(
+                urun.getId(),
+                urun.getAd(),
+                urun.getFiyat(),
+                urun.getStok()
+        );
     }
 }

@@ -22,9 +22,6 @@ public class SiparisService {
         this.siparisRepository = siparisRepository;
     }
 
-    // @Transactional(readOnly = true): metot boyunca tek bir veritabani oturumu acik kalir.
-    // Lazy iliskilere dokunabilmek icin gerekli, yoksa LazyInitializationException alirsin.
-    // ---- YAVAS YOL: duz findAll(), iliskiler tek tek cekilir -> N+1 ----
     @Transactional(readOnly = true)
     public List<Siparis> tumSiparisleriGetir() {
         log.info(">>>>> SAYIM BASLIYOR | YONTEM: findAll() <<<<<");
@@ -34,7 +31,6 @@ public class SiparisService {
         return siparisler;
     }
 
-    // ---- HIZLI YOL: JOIN FETCH, her sey tek sorguda ----
     @Transactional(readOnly = true)
     public List<Siparis> tumSiparisleriHizliGetir() {
         log.info(">>>>> SAYIM BASLIYOR | YONTEM: JOIN FETCH <<<<<");
@@ -44,8 +40,6 @@ public class SiparisService {
         return siparisler;
     }
 
-    // Her iki yolda da AYNI isi yapiyoruz: kullaniciya ve kalemlere dokunup
-    // toplam tutari hesapliyoruz. Fark sadece verinin nasil cekildiginde.
     private void ozetle(List<Siparis> siparisler) {
         for (Siparis siparis : siparisler) {
             BigDecimal toplam = BigDecimal.ZERO;

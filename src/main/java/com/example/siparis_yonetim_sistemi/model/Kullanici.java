@@ -15,7 +15,6 @@ import lombok.Setter;
 import java.util.ArrayList;
 import java.util.List;
 
-// Bu dosya hazir. Takilinca ornek olarak buraya bak.
 
 @Entity
 @Table(name = "kullanicilar")
@@ -34,7 +33,6 @@ public class Kullanici {
     @Column(nullable = false, unique = true, length = 150)
     private String email;
 
-    // ORNEK: iliskinin ayna tarafi. "kullanici" = Siparis sinifindaki alanin adi.
     @OneToMany(mappedBy = "kullanici")
     @JsonIgnore
     private List<Siparis> siparisler = new ArrayList<>();

@@ -13,8 +13,6 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.util.List;
 
-// CommandLineRunner: uygulama ayaga kalktiktan hemen sonra run() bir kez calisir.
-// Ornek veri yuklemek icin standart yontem.
 @Component
 public class VeriYukleyici implements CommandLineRunner {
 
@@ -51,7 +49,6 @@ public class VeriYukleyici implements CommandLineRunner {
 
         Urun[] katalog = { klavye, mouse, monitor, kulak, kamera };
 
-        // 4 kullanici x 3 siparis = 12 siparis, her sipariste 2 kalem.
         for (Kullanici kullanici : kullanicilar) {
             for (int i = 0; i < 3; i++) {
                 Siparis siparis = new Siparis(kullanici);
@@ -59,7 +56,6 @@ public class VeriYukleyici implements CommandLineRunner {
                 Urun birinci = katalog[i % katalog.length];
                 Urun ikinci  = katalog[(i + 2) % katalog.length];
 
-                // cascade = ALL sayesinde kalemleri ayrica kaydetmiyoruz.
                 siparis.kalemEkle(new SiparisKalemi(birinci, i + 1, birinci.getFiyat()));
                 siparis.kalemEkle(new SiparisKalemi(ikinci, 1, ikinci.getFiyat()));
 

@@ -102,19 +102,22 @@ Aşama 5'te `UrunService.urunGetir` içindeki `.orElse(null)` → `.orElseThrow(
 
 ---
 
-## Aşama 5 — Validation ve Hata Yönetimi
+## Aşama 5 — Validation ve Hata Yönetimi ✅ BİTTİ
 
 - [x] pom'a `spring-boot-starter-validation` ekle
-- [ ] `dto` paketi → `UrunIstekDto`, `UrunYanitDto` (entity'yi dışarı açma)
-- [ ] `@NotNull`, `@NotBlank`, `@Min`, `@Positive` ile doğrulama
-- [ ] Controller'da `@Valid`
+- [x] `dto` paketi → `UrunIstekDto`, `UrunYanitDto` (entity'yi dışarı açma)
+- [x] `@NotNull`, `@NotBlank`, `@Positive`, `@PositiveOrZero` ile doğrulama (UrunIstekDto'da)
+- [x] Service: `yanitaDonustur`, `urunBul` (private) ayrıldı; `urunGetir` + `tumUrunleriGetir` DTO dönüyor (Postman ✅)
+- [x] `urunEkle` → DTO'ya geçir
+- [x] `urunGuncelle` → DTO'ya geçir
+- [x] Controller'da `@Valid` (POST + PUT) + `MethodArgumentNotValidException` handler → alan bazlı 400 mesajları
 - [x] `exception` paketi → `UrunBulunamadiException` (`RuntimeException`, mesaj `super(...)` ile)
 - [x] `GlobalExceptionHandler` (`@RestControllerAdvice`) → tek yerden hata yakalama
 - [x] GET / PUT / DELETE olmayan id'de **404** (Postman'den test edildi)
-- [ ] Doğru status kodları: 201 Created, 400
-- [ ] (Ek) Siparişte kullanılan ürün silinince 500 yerine **409 Conflict** (`DataIntegrityViolationException`)
+- [x] Doğru status kodları: 201 Created (`@ResponseStatus`), 400
+- [x] (Ek) Siparişte kullanılan ürün silinince 500 yerine **409 Conflict** (`DataIntegrityViolationException`)
 - [x] Ara commit: "Asama 5 (1/2): exception ve GlobalExceptionHandler ile 404"
-- [ ] Commit: "Asama 5: validation ve hata yonetimi"
+- [x] Commit: "Asama 5: validation ve hata yonetimi"
 
 **Takıldığın noktalar (tekrar et):**
 1. `System.out.println` mesajı exception'a koymaz → `super(mesaj)` ile üst sınıfa ver, yoksa `getMessage()` `null`.
@@ -125,6 +128,15 @@ Aşama 5'te `UrunService.urunGetir` içindeki `.orElse(null)` → `.orElseThrow(
 6. Spring Data 3+'ta `deleteById` olmayan id'de sessiz kalır → önce `existsById`.
 7. PUT'ta gövde yoksa 400: Spring gövdeyi metodu çağırmadan **önce** okur, 404 kontrolüne sıra gelmez.
 8. Mülakat: `open-in-view` varsayılan açık → istek boyunca persistence context açık kalır (aynı `findById` ikinci kez DB'ye gitmez). Neden birçok ekip kapatır?
+9. Sayısal alanda `@NotBlank`/`@NotEmpty` **derlenir ama çalışma zamanında patlar** (`UnexpectedTypeException`) — anotasyonun tipe uygunluğunu derleyici kontrol etmez.
+10. `@NotNull` ⊂ `@NotEmpty` ⊂ `@NotBlank` (null / "" / "   "). Metin için tek `@NotBlank` yeter. `@Positive` 0'ı reddeder, `@PositiveOrZero` kabul eder.
+11. Yanıt DTO'suna doğrulama konmaz — doğrulama `@Valid` ile, sadece **gelen** veride tetiklenir.
+12. İki kez aynı hata: `new XDto()` / boş gövdeli constructor → nesne oluşur ama **veri aktarılmaz**, hepsi `null`. Derleyici yakalamaz.
+13. IntelliJ quick fix hatayı susturur, doğru düzeltmeyi yapmayabilir (id'siz boş constructor üretti).
+14. `save()`'in dönüşünü kullan: yeni entity → `persist` (aynı nesne), id dolu → `merge` (yeni kopya).
+15. Kural: **içeri giren → parametre → `UrunIstekDto`**, **dışarı çıkan → dönüş tipi → `UrunYanitDto`**. Entity controller'a hiç çıkmaz; service'in public metotları DTO, private metotları entity konuşur.
+16. `@Valid` olmadan anotasyonlar hiçbir şey yapmaz (geçersiz ürün 200 ile kaydedildi). POST → 201, PUT → 200 (yeni kaynak yok), DELETE → ideali 204.
+17. Exception zinciri: H2'nin `JdbcSQL...Exception`'ı en altta; Spring'in `DataIntegrityViolationException`'ını yakala → DB'den bağımsız. `ex.getMessage()`'ı istemciye dönme (tablo/SQL sızar). Global handler'da mesaj fazla özel ("Bu ürün...") — Aşama 6'da e-posta çakışmasında yanlış mesaj verir.
 
 **Öğrenilecek:** Bean Validation, global exception handling, DTO deseni
 

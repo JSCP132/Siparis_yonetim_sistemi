@@ -144,16 +144,33 @@ Aşama 5'te `UrunService.urunGetir` içindeki `.orElse(null)` → `.orElseThrow(
 
 ## Aşama 6 — Spring Security + JWT
 
-- [ ] `spring-boot-starter-security` geri ekle + `jjwt` bağımlılıkları
+- [ ] `spring-boot-starter-security` geri ekle + `jjwt` bağımlılıkları (security ✅, jjwt bekliyor)
 - [ ] `Kullanici`'ya `sifre` ve `rol` alanları
 - [ ] `BCryptPasswordEncoder` bean'i, şifreyi **asla düz metin saklama**
 - [ ] `JwtUtil` — token üret / doğrula / içinden kullanıcı çıkar
 - [ ] `JwtAuthenticationFilter` — her istekte header'daki token'ı kontrol et
-- [ ] `SecurityConfig` — filter chain, hangi endpoint açık hangi kapalı
+- [ ] `SecurityConfig` — filter chain, hangi endpoint açık hangi kapalı (ilk hâli ✅: CSRF kapalı, stateless, GET ürünler + `/error` açık, gerisi kimlik ister, şimdilik HTTP Basic — JWT filter'ı sonra eklenecek)
 - [ ] `POST /api/auth/kayit` ve `POST /api/auth/giris`
 - [ ] Rol bazlı yetki: USER / ADMIN
 - [ ] Test et: tokensiz → **401**, yanlış rolle → **403**
 - [ ] Commit: "Asama 6: security ve jwt"
+
+**Kavram notları (tekrar et):**
+1. Geçerli token + yetersiz rol → **403**, 401 değil: token geçerli olduğu için kim olduğu biliniyor (authentication geçti), takılan yer authorization.
+2. Filter'da fırlatılan exception `GlobalExceptionHandler`'a **ulaşmaz** — filter DispatcherServlet'ten önce, `@RestControllerAdvice` onun içinde çalışır. Security hataları `AuthenticationEntryPoint` / `AccessDeniedHandler` ile ele alınır. (Benzetme: kapıdaki görevli seni durdurursa içerideki şikâyet masasına varamazsın.)
+3. Birden fazla sunucuda session sorun çıkarır (kayıt sadece girişin yapıldığı sunucunun hafızasında); JWT çıkarmaz (her sunucu aynı gizli anahtarla imzayı kendisi doğrular). Stateless = sunucu seni hatırlamaz, her istekte kanıt ister. (Benzetme: vestiyer fişi vs pasaport.)
+4. JWT = header.payload.imza. Payload **şifreli değil**, Base64 ile kodlanmış → herkes okur (jwt.io). Kimlik (`sub`) ve rol konabilir, şifre (hash'i bile) **asla**. Kullanıcı bilgisi header'da değil payload'da durur.
+5. İmza gizliliği değil **değiştirilmediğini** korur. Payload'ı değiştiren saldırgan **gizli anahtarı** bilmediği için yeni imza üretemez → token geçersiz → **401** (403 değil, çünkü kimlik doğrulanamadı). Gizli anahtar public repoya yazılmaz.
+6. BCrypt her `encode`'da **yeni rastgele salt** üretir → aynı şifre her seferinde farklı hash → `equals` ile karşılaştırma hep `false`. Doğrusu `matches(girilen, kayitliHash)`: salt'ı hash'in içinden okur, girileni o salt'la hash'ler. SHA-256 hızlı (saldırgana yarar), BCrypt kasıtlı yavaş (cost).
+7. **Auto-configuration:** sadece `spring-boot-starter-security` eklemek her endpoint'i kilitledi ve `user` + rastgele şifre üretti. Boot classpath'e bakar: `@ConditionalOnClass` (kütüphane var mı?) + `@ConditionalOnMissingBean` (geliştirici kendisi tanımlamış mı?). Kendi bean'ini tanımlarsan varsayılan geri çekilir. Aşama 3'te DataSource da böyle kurulmuştu. `@SpringBootApplication` = `@Configuration` + `@ComponentScan` + `@EnableAutoConfiguration`.
+8. Aynı istek: Postman → **401**, tarayıcı → **login sayfası**. Security `Accept` header'ına bakıp farklı `AuthenticationEntryPoint` seçer (tarayıcı HTML ister → form login; Postman → Basic).
+9. Basic Auth header'ı = Base64(`user:şifre`) → şifre **her istekte** gider, herkes çözer. JWT'de şifre sadece girişte bir kez gider.
+10. pom değişince IntelliJ'de **Load Maven Changes** (Ctrl+Shift+O) yapılmazsa çalışan uygulama yeni bağımlılığı görmez (`mvnw compile` IntelliJ'i güncellemez). Beklenmedik sonuçta önce deneyi doğrula: çalışan şey gerçekten benim kodum mu?
+11. Aynı kimlikle GET → 200, POST → 401. Sebep **CSRF**: `CsrfFilter` kimlik kontrolünden **önce** çalışır, CSRF token'ı olmayan POST'u **403** ile reddeder. 403 `/error`'a yönlenir, `/error` da kilitli ve o turda kullanıcı anonim → istemciye **401** ulaşır. Status kodu asıl sebebi gizleyebilir; gerçeği `logging.level.org.springframework.security=DEBUG` loglarında oku. (SecurityConfig'te `/error` açılacak.)
+12. **CSRF** (siteler arası istek sahteciliği): tarayıcı cookie'yi her isteğe **kendiliğinden** ekler → kötü site, giriş yapmış kullanıcının tarayıcısına onun adına istek attırabilir. Koruma: sayfaya gömülü, kötü sitenin okuyamadığı rastgele token. Sadece veri **değiştiren** metotlar (POST/PUT/DELETE/PATCH) kontrol edilir; GET veri değiştirmemeli (REST kuralı).
+13. JWT `Authorization` header'ında taşınırsa tarayıcı onu kendiliğinden eklemez → CSRF'in aracı yok → stateless JWT API'de `csrf` **kapatılır**. JWT cookie'de saklanırsa CSRF riski geri gelir.
+14. Kendi `SecurityFilterChain` bean'imizi tanımlayınca varsayılan zincir geri çekildi ama `user` + rastgele şifre **kaldı**. Her auto-config parçası kendi koşuluna bakar: varsayılan kullanıcının koşulu `UserDetailsService` yokluğu, `SecurityFilterChain` değil. Kendi `UserDetailsService`'imizi yazınca şifre satırı kaybolacak.
+15. Test sonucu (CSRF kapalı + kurallar): GET ürünler No Auth → 200, GET siparişler No Auth → 401, POST No Auth → 401 (artık **gerçek** 401, CSRF maskelemesi değil), POST Basic → **201**. Kurallar yukarıdan aşağı okunur, ilk eşleşen kazanır; `anyRequest()` en sona.
 
 **Öğrenilecek:** Authentication vs authorization, filter chain, JWT — mülakatın en yoğun sorulan kısmı
 

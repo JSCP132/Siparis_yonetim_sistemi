@@ -1,13 +1,7 @@
 package com.example.siparis_yonetim_sistemi.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -33,12 +27,23 @@ public class Kullanici {
     @Column(nullable = false, unique = true, length = 150)
     private String email;
 
+    @Column(nullable = false,length = 60)
+    private String sifre;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Rol rol; // Tek alan. Tip "Rol" (USER ya da ADMIN olabilir), alanın adı "rol"; değeri constructor'da verilir.
+
     @OneToMany(mappedBy = "kullanici")
     @JsonIgnore
     private List<Siparis> siparisler = new ArrayList<>();
 
-    public Kullanici(String ad, String email) {
+    // id parametre değil: IDENTITY ile veritabanı verir. Eski (ad, email) constructor'ı silindi,
+    // artık şifresi ve rolü olmayan kullanıcı oluşturulamaz (JPA için @NoArgsConstructor yeter).
+    public Kullanici(String ad, String email, String sifre, Rol rol) {
         this.ad = ad;
         this.email = email;
+        this.sifre = sifre;
+        this.rol = rol;
     }
 }

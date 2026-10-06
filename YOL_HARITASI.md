@@ -145,8 +145,10 @@ Aşama 5'te `UrunService.urunGetir` içindeki `.orElse(null)` → `.orElseThrow(
 ## Aşama 6 — Spring Security + JWT
 
 - [ ] `spring-boot-starter-security` geri ekle + `jjwt` bağımlılıkları (security ✅, jjwt bekliyor)
-- [ ] `Kullanici`'ya `sifre` ve `rol` alanları
-- [ ] `BCryptPasswordEncoder` bean'i, şifreyi **asla düz metin saklama**
+- [x] `Kullanici`'ya `sifre` ve `rol` alanları (`Rol` enum, `EnumType.STRING`)
+- [x] `BCryptPasswordEncoder` bean'i, şifreyi **asla düz metin saklama**
+- [x] `UserDetailsService` (`KullaniciDetayService`) — kullanıcılar veritabanından, `findByEmail`
+- [ ] Sipariş endpoint'leri DTO döndürsün (şifre hash'i sızıntısı, not 22)
 - [ ] `JwtUtil` — token üret / doğrula / içinden kullanıcı çıkar
 - [ ] `JwtAuthenticationFilter` — her istekte header'daki token'ı kontrol et
 - [ ] `SecurityConfig` — filter chain, hangi endpoint açık hangi kapalı (ilk hâli ✅: CSRF kapalı, stateless, GET ürünler + `/error` açık, gerisi kimlik ister, şimdilik HTTP Basic — JWT filter'ı sonra eklenecek)
@@ -171,6 +173,13 @@ Aşama 5'te `UrunService.urunGetir` içindeki `.orElse(null)` → `.orElseThrow(
 13. JWT `Authorization` header'ında taşınırsa tarayıcı onu kendiliğinden eklemez → CSRF'in aracı yok → stateless JWT API'de `csrf` **kapatılır**. JWT cookie'de saklanırsa CSRF riski geri gelir.
 14. Kendi `SecurityFilterChain` bean'imizi tanımlayınca varsayılan zincir geri çekildi ama `user` + rastgele şifre **kaldı**. Her auto-config parçası kendi koşuluna bakar: varsayılan kullanıcının koşulu `UserDetailsService` yokluğu, `SecurityFilterChain` değil. Kendi `UserDetailsService`'imizi yazınca şifre satırı kaybolacak.
 15. Test sonucu (CSRF kapalı + kurallar): GET ürünler No Auth → 200, GET siparişler No Auth → 401, POST No Auth → 401 (artık **gerçek** 401, CSRF maskelemesi değil), POST Basic → **201**. Kurallar yukarıdan aşağı okunur, ilk eşleşen kazanır; `anyRequest()` en sona.
+16. `private Rol USER, ADMIN;` tek bir rol alanı değil, `int x, y;` gibi **iki ayrı alan** tanımlar (derlenir, yanlış). Doğrusu `private Rol rol;` — tip (`Rol`) olası değerleri zaten söyler, alan adı küçük harf, değer constructor'da verilir. Enum'u `@Enumerated(EnumType.STRING)` ile sakla; varsayılan `ORDINAL` sıra numarası yazar, enum'a başa değer eklenince herkesin rolü kayar.
+17. IntelliJ "Generate Constructor" seçilen her alanı alır, `id` dahil. `id` constructor'a verilmez (IDENTITY → veritabanı verir; dolu id ile `save` → `merge`, bkz. Aşama 5 not 14). Yan yana aynı tipte parametreler (`String ad, String email, String sifre`) yer değiştirse derleyici yakalamaz.
+18. `encode("1234")` her kullanıcı için **ayrı** çağrılır → her biri yeni salt → aynı şifre, 4 farklı hash. Bir kez çağırıp paylaşırsan 4 hash aynı olur: veritabanını gören, aynı şifreyi kullananları anlar, birini kıran hepsini kırar.
+19. `PasswordEncoder` bean'ini (BCrypt) ekleyince konsoldaki `user` + şifre de **401** vermeye başladı. Boot, encoder bean'i varsa üretilen şifreyi olduğu gibi (düz metin) saklar; giriş sırasında BCrypt düz metni hash'le karşılaştıramaz (log: `Encoded password does not look like BCrypt`). Bir bean eklemek başka bir auto-config parçasının davranışını değiştirebilir.
+20. Kendi `UserDetailsService`'imizi yazınca konsoldaki şifre satırı **kayboldu** (`@ConditionalOnMissingBean(UserDetailsService)`). Akış: Spring `loadUserByUsername(email)` çağırır → biz kullanıcıyı bulup email + hash + rol veririz → `matches()`'i **Spring** çağırır. `findByEmail` gövdesiz: Spring Data SQL'i metot adından üretir.
+21. Yanlış şifre ve olmayan kullanıcı **aynı 401**'i alır. Farklı cevap verseydi saldırgan hangi email'lerin kayıtlı olduğunu öğrenirdi (**user enumeration**). Spring `UsernameNotFoundException`'ı gizleyip "kimlik bilgisi hatalı"ya çevirir; bizim mesajımız istemciye gitmez.
+22. ⚠️ **Sızıntı:** `GET /api/siparisler` entity döndürdüğü için giriş yapan **her** kullanıcı, bütün kullanıcıların email'ini, rolünü ve şifre hash'ini (`$2a$10$...`) görüyordu. Kullanıcı entity'sine alan eklemek API cevabını sessizce değiştirdi. Aşama 5 kuralı (entity dışarı çıkmaz) sadece ürünlerde uygulanmıştı. `@JsonIgnore` = **kara liste** (gizleneceği say; unutulan alan sızar), DTO = **beyaz liste** (gösterileceği say; unutulan alan gizli kalır). Mülakatta "neden DTO?" sorusunun hikâyesi bu.
 
 **Öğrenilecek:** Authentication vs authorization, filter chain, JWT — mülakatın en yoğun sorulan kısmı
 

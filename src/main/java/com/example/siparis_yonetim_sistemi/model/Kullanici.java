@@ -1,6 +1,5 @@
 package com.example.siparis_yonetim_sistemi.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -35,7 +34,6 @@ public class Kullanici {
     private Rol rol; // Tek alan. Tip "Rol" (USER ya da ADMIN olabilir), alanın adı "rol"; değeri constructor'da verilir.
 
     @OneToMany(mappedBy = "kullanici")
-    @JsonIgnore
     private List<Siparis> siparisler = new ArrayList<>();
 
     // id parametre değil: IDENTITY ile veritabanı verir. Eski (ad, email) constructor'ı silindi,

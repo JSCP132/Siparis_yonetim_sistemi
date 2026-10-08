@@ -1,5 +1,7 @@
 package com.example.siparis_yonetim_sistemi.service;
 
+import com.example.siparis_yonetim_sistemi.dto.SiparisKalemiYanitDto;
+import com.example.siparis_yonetim_sistemi.dto.SiparisYanitDto;
 import com.example.siparis_yonetim_sistemi.model.Siparis;
 import com.example.siparis_yonetim_sistemi.model.SiparisKalemi;
 import com.example.siparis_yonetim_sistemi.repository.SiparisRepository;
@@ -23,32 +25,48 @@ public class SiparisService {
     }
 
     @Transactional(readOnly = true)
-    public List<Siparis> tumSiparisleriGetir() {
+    public List<SiparisYanitDto> tumSiparisleriGetir() {
         log.info(">>>>> SAYIM BASLIYOR | YONTEM: findAll() <<<<<");
         List<Siparis> siparisler = siparisRepository.findAll();
-        ozetle(siparisler);
+        List<SiparisYanitDto> sonuc=siparisler.stream().map(this::yanitaDonustur).toList();
+
         log.info(">>>>> SAYIM BITTI | findAll() | {} siparis <<<<<", siparisler.size());
-        return siparisler;
+        return sonuc;
     }
 
     @Transactional(readOnly = true)
-    public List<Siparis> tumSiparisleriHizliGetir() {
+    public List<SiparisYanitDto> tumSiparisleriHizliGetir() {
         log.info(">>>>> SAYIM BASLIYOR | YONTEM: JOIN FETCH <<<<<");
         List<Siparis> siparisler = siparisRepository.tumunuIliskileriyleGetir();
-        ozetle(siparisler);
+        List<SiparisYanitDto> sonuc=siparisler.stream().map(this::yanitaDonustur).toList();
+
         log.info(">>>>> SAYIM BITTI | JOIN FETCH | {} siparis <<<<<", siparisler.size());
-        return siparisler;
+        return sonuc;
     }
 
-    private void ozetle(List<Siparis> siparisler) {
-        for (Siparis siparis : siparisler) {
-            BigDecimal toplam = BigDecimal.ZERO;
-            for (SiparisKalemi kalem : siparis.getKalemler()) {
-                toplam = toplam.add(kalem.getBirimFiyat().multiply(BigDecimal.valueOf(kalem.getAdet())));
-            }
-            log.info("Siparis #{} | musteri: {} | {} kalem | toplam: {} TL",
-                    siparis.getId(), siparis.getKullanici().getAd(),
-                    siparis.getKalemler().size(), toplam);
-        }
+    private SiparisYanitDto yanitaDonustur(Siparis siparis) {
+        List<SiparisKalemiYanitDto> kalemler = siparis.getKalemler().stream()
+                .map(this::kalemYanitaDonustur)
+                .toList();
+
+        BigDecimal toplam = kalemler.stream()
+                .map(k -> k.getBirimFiyat().multiply(BigDecimal.valueOf(k.getAdet())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        SiparisYanitDto dto = new SiparisYanitDto();
+        dto.setId(siparis.getId());
+        dto.setTarih(siparis.getTarih());
+        dto.setKullaniciAdi(siparis.getKullanici().getAd());
+        dto.setKalemler(kalemler);
+        dto.setToplamTutar(toplam);
+        return dto;
+    }
+
+    private SiparisKalemiYanitDto kalemYanitaDonustur(SiparisKalemi kalem) {
+        SiparisKalemiYanitDto dto = new SiparisKalemiYanitDto();
+        dto.setUrunAdi(kalem.getUrun().getAd());
+        dto.setAdet(kalem.getAdet());
+        dto.setBirimFiyat(kalem.getBirimFiyat());
+        return dto;
     }
 }

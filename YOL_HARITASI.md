@@ -148,7 +148,7 @@ Aşama 5'te `UrunService.urunGetir` içindeki `.orElse(null)` → `.orElseThrow(
 - [x] `Kullanici`'ya `sifre` ve `rol` alanları (`Rol` enum, `EnumType.STRING`)
 - [x] `BCryptPasswordEncoder` bean'i, şifreyi **asla düz metin saklama**
 - [x] `UserDetailsService` (`KullaniciDetayService`) — kullanıcılar veritabanından, `findByEmail`
-- [ ] Sipariş endpoint'leri DTO döndürsün (şifre hash'i sızıntısı, not 22)
+- [x] Sipariş endpoint'leri DTO döndürsün (şifre hash'i sızıntısı, not 22) — `SiparisYanitDto` + `SiparisKalemiYanitDto`, Postman ✅, sorgular hâlâ 17 → 1
 - [ ] `JwtUtil` — token üret / doğrula / içinden kullanıcı çıkar
 - [ ] `JwtAuthenticationFilter` — her istekte header'daki token'ı kontrol et
 - [ ] `SecurityConfig` — filter chain, hangi endpoint açık hangi kapalı (ilk hâli ✅: CSRF kapalı, stateless, GET ürünler + `/error` açık, gerisi kimlik ister, şimdilik HTTP Basic — JWT filter'ı sonra eklenecek)
@@ -180,6 +180,11 @@ Aşama 5'te `UrunService.urunGetir` içindeki `.orElse(null)` → `.orElseThrow(
 20. Kendi `UserDetailsService`'imizi yazınca konsoldaki şifre satırı **kayboldu** (`@ConditionalOnMissingBean(UserDetailsService)`). Akış: Spring `loadUserByUsername(email)` çağırır → biz kullanıcıyı bulup email + hash + rol veririz → `matches()`'i **Spring** çağırır. `findByEmail` gövdesiz: Spring Data SQL'i metot adından üretir.
 21. Yanlış şifre ve olmayan kullanıcı **aynı 401**'i alır. Farklı cevap verseydi saldırgan hangi email'lerin kayıtlı olduğunu öğrenirdi (**user enumeration**). Spring `UsernameNotFoundException`'ı gizleyip "kimlik bilgisi hatalı"ya çevirir; bizim mesajımız istemciye gitmez.
 22. ⚠️ **Sızıntı:** `GET /api/siparisler` entity döndürdüğü için giriş yapan **her** kullanıcı, bütün kullanıcıların email'ini, rolünü ve şifre hash'ini (`$2a$10$...`) görüyordu. Kullanıcı entity'sine alan eklemek API cevabını sessizce değiştirdi. Aşama 5 kuralı (entity dışarı çıkmaz) sadece ürünlerde uygulanmıştı. `@JsonIgnore` = **kara liste** (gizleneceği say; unutulan alan sızar), DTO = **beyaz liste** (gösterileceği say; unutulan alan gizli kalır). Mülakatta "neden DTO?" sorusunun hikâyesi bu.
+23. **DTO'nun içine entity koyma.** İlk denemede `SiparisYanitDto` içinde `Kullanici kullanici`, `List<SiparisKalemi>`, `SiparisKalemiYanitDto` içinde `Urun urun` vardı → Jackson iç içe entity'yi de açar, sızıntı aynen sürer; derleyici yakalamaz. DTO alanları ya basit tip (`String`, `Long`, `BigDecimal`, `LocalDateTime`) ya da **başka DTO**. Beyaz liste en içteki alana kadar geçerliyse işe yarar. (Benzetme: mühürlü koliyi açmadan yeni koliye koymak.)
+24. **Snapshot:** kalemde `SiparisKalemi.birimFiyat` gösterilir (sipariş anının fiyatı, fiş), `Urun.fiyat` değil (bugünün fiyatı, raf etiketi). Zam gelince eski siparişin toplamı değişmemeli. `toplamTutar` veritabanında tutulmaz, dönüşümde kalemlerden **hesaplanır**.
+25. `map(this::yanitaDonustur)` = **method reference** = `s -> this.yanitaDonustur(s)` (lambda parametreyi olduğu gibi bir metoda veriyorsa kısaltılır). `reduce(BigDecimal.ZERO, BigDecimal::add)`: `ZERO` = **identity** (başlangıç; boş listede sonuç 0), `add` = **accumulator** (ara toplam + sıradaki). Başlangıçsız `reduce(BigDecimal::add)` → `Optional<BigDecimal>` döner (boş listede değer yok).
+26. **Çift yönlü ilişki + entity'yi JSON'a çevirmek = sonsuz döngü** (Siparis → kalemler → kalem.siparis → Siparis → …; Siparis → kullanici → siparisler → …) → 500. Entity'lerdeki iki `@JsonIgnore` bunu kırıyordu. DTO'ya geçince ikisi silindi, iki endpoint hâlâ **200** → Jackson'ın artık entity görmediğinin kanıtı. DTO'ya geçmek N+1 sayılarını değiştirmedi (17 → 1): dönüşüm, `@Transactional` metodun içinde, iki `SAYIM` logu arasında ilişkilere dokunuyor; `ozetle` bu yüzden gereksiz kaldı ve silindi.
+27. Alan adı = JSON anahtarı = **API sözleşmesi**. `kullaniciAadi`, `toplamtutar` derlenir ama dışarıya öyle yayınlanır; frontend kullanmaya başladıktan sonra düzeltmek onları bozar. (Ctrl+Alt+O: kullanılmayan import'ları siler.)
 
 **Öğrenilecek:** Authentication vs authorization, filter chain, JWT — mülakatın en yoğun sorulan kısmı
 

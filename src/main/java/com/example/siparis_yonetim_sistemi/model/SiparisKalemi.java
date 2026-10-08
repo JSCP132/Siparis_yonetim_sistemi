@@ -1,6 +1,5 @@
 package com.example.siparis_yonetim_sistemi.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -34,7 +33,6 @@ public class SiparisKalemi {
 
     @ManyToOne
     @JoinColumn(name = "siparis_id")
-    @JsonIgnore
     private Siparis siparis;
 
     @ManyToOne

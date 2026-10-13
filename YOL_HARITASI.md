@@ -144,12 +144,12 @@ Aşama 5'te `UrunService.urunGetir` içindeki `.orElse(null)` → `.orElseThrow(
 
 ## Aşama 6 — Spring Security + JWT
 
-- [ ] `spring-boot-starter-security` geri ekle + `jjwt` bağımlılıkları (security ✅, jjwt bekliyor)
+- [x] `spring-boot-starter-security` geri ekle + `jjwt` bağımlılıkları (jjwt 0.13.0: api + impl/jackson `runtime`)
 - [x] `Kullanici`'ya `sifre` ve `rol` alanları (`Rol` enum, `EnumType.STRING`)
 - [x] `BCryptPasswordEncoder` bean'i, şifreyi **asla düz metin saklama**
 - [x] `UserDetailsService` (`KullaniciDetayService`) — kullanıcılar veritabanından, `findByEmail`
 - [x] Sipariş endpoint'leri DTO döndürsün (şifre hash'i sızıntısı, not 22) — `SiparisYanitDto` + `SiparisKalemiYanitDto`, Postman ✅, sorgular hâlâ 17 → 1
-- [ ] `JwtUtil` — token üret / doğrula / içinden kullanıcı çıkar
+- [x] `JwtUtil` — token üret / doğrula / içinden kullanıcı çıkar (`tokenUret`, `emailCikar`; `JwtUtilTest` ile denendi: geçerli / sahte imza / süresi dolmuş)
 - [ ] `JwtAuthenticationFilter` — her istekte header'daki token'ı kontrol et
 - [ ] `SecurityConfig` — filter chain, hangi endpoint açık hangi kapalı (ilk hâli ✅: CSRF kapalı, stateless, GET ürünler + `/error` açık, gerisi kimlik ister, şimdilik HTTP Basic — JWT filter'ı sonra eklenecek)
 - [ ] `POST /api/auth/kayit` ve `POST /api/auth/giris`
@@ -185,6 +185,13 @@ Aşama 5'te `UrunService.urunGetir` içindeki `.orElse(null)` → `.orElseThrow(
 25. `map(this::yanitaDonustur)` = **method reference** = `s -> this.yanitaDonustur(s)` (lambda parametreyi olduğu gibi bir metoda veriyorsa kısaltılır). `reduce(BigDecimal.ZERO, BigDecimal::add)`: `ZERO` = **identity** (başlangıç; boş listede sonuç 0), `add` = **accumulator** (ara toplam + sıradaki). Başlangıçsız `reduce(BigDecimal::add)` → `Optional<BigDecimal>` döner (boş listede değer yok).
 26. **Çift yönlü ilişki + entity'yi JSON'a çevirmek = sonsuz döngü** (Siparis → kalemler → kalem.siparis → Siparis → …; Siparis → kullanici → siparisler → …) → 500. Entity'lerdeki iki `@JsonIgnore` bunu kırıyordu. DTO'ya geçince ikisi silindi, iki endpoint hâlâ **200** → Jackson'ın artık entity görmediğinin kanıtı. DTO'ya geçmek N+1 sayılarını değiştirmedi (17 → 1): dönüşüm, `@Transactional` metodun içinde, iki `SAYIM` logu arasında ilişkilere dokunuyor; `ozetle` bu yüzden gereksiz kaldı ve silindi.
 27. Alan adı = JSON anahtarı = **API sözleşmesi**. `kullaniciAadi`, `toplamtutar` derlenir ama dışarıya öyle yayınlanır; frontend kullanmaya başladıktan sonra düzeltmek onları bozar. (Ctrl+Alt+O: kullanılmayan import'ları siler.)
+28. **Gizli anahtar repoya yazılmaz:** `jwt.gizli-anahtar=${JWT_GIZLI_ANAHTAR}` → değer ortam değişkeninden gelir; varsayılan değer bilerek yok, anahtarsız uygulama hiç açılmaz. Testler ayrı, gizli olmayan bir anahtar kullanır. Anahtar üret: `openssl rand -base64 32`.
+29. **Builder deseni:** `Jwts.builder().subject(..).issuedAt(..).expiration(..).signWith(..).compact()` — her metot aynı "sipariş formunu" geri döndürür, o yüzden zincirlenir; sondaki `compact()` ürünü (token metnini) verir. (Benzetme: pasaport dairesi — kimin, veriliş, son geçerlilik, mühür, basılıp ele verilmesi.)
+30. İlk denemede iki zincir de doğruydu ama altına `return null;` kalmıştı → iki metot da **hep `null`** döndü. Dönüş değeri atanmaz/`return` edilmezse **sessizce çöpe gider**, derleyici uyarmaz (not 12'nin ailesi: derlenir ama veri aktarılmaz).
+31. **Deneme sonucu — `emailCikar` geçersiz token'da `null` döndürmez, exception fırlatır:** süresi dolmuş → `ExpiredJwtException`; başka anahtarla imzalanmış → `SignatureException` ("signature does not match locally computed signature"). Sunucu header+payload'ı **kendi** anahtarıyla yeniden imzalar, token'daki imzayla karşılaştırır — saldırgan payload'a `admin@ornek.com` yazsa da anahtarı bilmeden geçerli imza üretemez (not 5 doğrulandı). Hepsi `JwtException`'ın alt sınıfı → filter yakalayıp **401** dönmeli; `GlobalExceptionHandler`'a ulaşmaz (not 2).
+32. jjwt algoritmayı **anahtar uzunluğuna göre** seçer (42 byte → HS256, 48 byte → HS384) ve header'a `alg` olarak yazar. Farklı uzunlukta anahtarla yapılan ilk sahte-imza denemesi `WeakKeyException` verdi: **reddedildi ama yanlış sebeple**. "Reddedildi" yazması yetmez, **nedenini oku** (not 11'in aynısı). Header'daki `alg` saldırganın elinde → kütüphane ona körü körüne güvenmemeli (mülakat: *algorithm confusion*).
+33. `iat`/`exp` **saniye** cinsinden saklanır (ms küsurat atılır) → "60755 ms önce doldu" (60 sn + atılan 755 ms). `Allowed clock skew` = sunucu saatleri arası kaymaya tanınan tolerans (bizde 0).
+34. Değerlerini constructor'dan alan sınıf **Spring'siz** `new`'lenip denenebilir: uygulama ayağa kalkmaz, ortam değişkeni gerekmez — constructor injection'ın test faydası (Aşama 2 → Aşama 7 köprüsü). Ama sadece `println` yapan test **asla kırmızı olmaz**; biri `JwtUtil`'i bozsa da yeşil kalır.
 
 **Öğrenilecek:** Authentication vs authorization, filter chain, JWT — mülakatın en yoğun sorulan kısmı
 
@@ -195,6 +202,7 @@ Aşama 5'te `UrunService.urunGetir` içindeki `.orElse(null)` → `.orElseThrow(
 - [ ] `UrunServiceTest` — JUnit 5 ile unit test
 - [ ] Mockito ile `UrunRepository`'yi mock'la (DI'nın faydası burada görünür)
 - [ ] Hata senaryosunu da test et (bulunamayan ürün → exception fırlıyor mu)
+- [ ] `JwtUtilTest`'teki `println` + `try/catch` denemelerini gerçek teste çevir (`assertEquals`, `assertThrows(ExpiredJwtException...)`) — Aşama 6 not 34
 - [ ] `@SpringBootTest` + `MockMvc` ile en az bir uçtan uca entegrasyon testi
 - [ ] Commit: "Asama 7: testler"
 
